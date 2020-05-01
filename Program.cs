@@ -1,12 +1,82 @@
-﻿using System;
+﻿using CommandLine;
+using Microsoft.Azure.ServiceBus.Management;
+using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace ServiceBusMonitor
 {
     class Program
     {
-        static void Main(string[] args)
+        static int Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            var result = Parser.Default.ParseArguments<Options>(args)
+                .MapResult(
+                    async options => await MainAsync(options),
+                    _ => Task.FromResult(NagiosStatus.Unknown)
+                );
+
+            return (int)result.Result;
+        }
+
+        static async Task<NagiosStatus> MainAsync(Options options)
+        {
+            //if (string.IsNullOrWhiteSpace(options.ConnectionString))
+            //{
+            //    Console.WriteLine("Failed to parse command line");
+            //    return (int)NagiosStatus.Unknown;
+            //}
+
+            var managementClient = new ManagementClient(options.ConnectionString);
+            var result = await QueryServicebusAsync(managementClient, options.Queue);
+
+            var message = $"Servicebus responded in {result.ResponseTime} ms";
+            var statistics = $"queues={result.Queues},messages={result.Messages}";
+
+            var statusCode = StatusCodeFrom(options, result.Messages);
+            Console.WriteLine($"{statusCode} {message}|{statistics}");
+
+            return statusCode;
+        }
+
+        private static async Task<ServiceBusResult> QueryServicebusAsync(ManagementClient managementClient, string queuePath)
+        {
+            int queueCount;
+            long messageCount;
+
+            var sw = Stopwatch.StartNew();
+            if (string.IsNullOrWhiteSpace(queuePath))
+            {
+                var queues = await managementClient.GetQueuesRuntimeInfoAsync();
+                queueCount = queues.Count();
+                messageCount = queues.Sum(info => info.MessageCount);
+            }
+            else
+            {
+                var info = await managementClient.GetQueueRuntimeInfoAsync(queuePath);
+                queueCount = 1;
+                messageCount = info.MessageCount;
+            }
+            sw.Stop();
+
+            return new ServiceBusResult
+            {
+                Messages = messageCount,
+                Queues = queueCount,
+                ResponseTime = sw.ElapsedMilliseconds
+            };
+        }
+
+        private static NagiosStatus StatusCodeFrom(Options options, long messageCount)
+        {
+            if (messageCount >= options.Critical)
+                return NagiosStatus.Critical;
+
+            if (messageCount >= options.Warning)
+                return NagiosStatus.Warning;
+
+            return NagiosStatus.OK;
         }
     }
 }
