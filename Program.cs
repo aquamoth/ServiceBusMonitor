@@ -30,12 +30,6 @@ namespace ServiceBusMonitor
 
         static async Task<NagiosStatus> MainAsync(Options options)
         {
-            //if (string.IsNullOrWhiteSpace(options.ConnectionString))
-            //{
-            //    Console.WriteLine("Failed to parse command line");
-            //    return (int)NagiosStatus.Unknown;
-            //}
-
             var managementClient = new ManagementClient(options.ConnectionString);
             var result = await QueryServicebusAsync(managementClient, options.Queue);
 
