@@ -17,7 +17,15 @@ namespace ServiceBusMonitor
                     _ => Task.FromResult(NagiosStatus.Unknown)
                 );
 
-            return (int)result.Result;
+            try
+            {
+                return (int)result.Result;
+            }
+            catch (AggregateException ex)
+            {
+                Console.Error.WriteLine($"{NagiosStatus.Unknown} Runtime exception: {string.Join(", ", ex.InnerExceptions.Select(x => x.Message))}");
+                return (int)NagiosStatus.Unknown;
+            }
         }
 
         static async Task<NagiosStatus> MainAsync(Options options)
