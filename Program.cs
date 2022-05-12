@@ -52,13 +52,13 @@ namespace ServiceBusMonitor
             {
                 var queues = await managementClient.GetQueuesRuntimeInfoAsync();
                 queueCount = queues.Count();
-                messageCount = queues.Sum(info => info.MessageCount);
+                messageCount = queues.Sum(info => info.MessageCountDetails.ActiveMessageCount);
             }
             else
             {
                 var info = await managementClient.GetQueueRuntimeInfoAsync(queuePath);
                 queueCount = 1;
-                messageCount = info.MessageCount;
+                messageCount = info.MessageCountDetails.ActiveMessageCount;
             }
             sw.Stop();
 
